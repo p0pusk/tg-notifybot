@@ -1,6 +1,6 @@
 import asyncio
-import datetime
-from aiogram import Router, types, F
+from datetime import datetime
+from aiogram import Bot, Router, types, F
 from aiogram.filters import Text
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
@@ -10,6 +10,7 @@ from utils.calendar import Calendar
 from utils.notification import Notification
 from utils.timepicker import TimePicker
 from db import db
+from config import bot_token
 
 
 class BotState(StatesGroup):
@@ -20,10 +21,11 @@ class BotState(StatesGroup):
 
 
 create_router = Router()
+bot = Bot(bot_token)
 
 
 async def run_at(dt, coro):
-    now = datetime.datetime.now()
+    now = datetime.now()
     await asyncio.sleep((dt - now).total_seconds())
     return await coro
 
@@ -81,6 +83,7 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
 
     elif command == TimePicker.command_confirm:
         nt.time = tp.time
+        nt.time.replace(second=datetime.now().second)
         kb = [
             [
                 types.InlineKeyboardButton(text="No", callback_data="-ATTACHMENTS-NO-"),
@@ -134,6 +137,7 @@ async def handle_attachments_no(query: types.CallbackQuery, state: FSMContext):
     )
 
     db.insert_notification(nt)
+    asyncio.get_event_loop().create_task(nt.send(bot))
     await state.clear()
 
 

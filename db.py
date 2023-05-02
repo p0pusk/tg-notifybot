@@ -1,7 +1,8 @@
 import psycopg2
-import json
+import datetime
 
 from utils.notification import Notification
+from config import dbconfig
 
 
 class _DataBase:
@@ -42,11 +43,39 @@ class _DataBase:
         except Exception as e:
             print(e)
 
+    def get_notifications_id(self, uid: int):
+        try:
+            res: list[Notification] = []
+            self.cur.execute("SELECT * from notifications WHERE uid = %s", (uid,))
+            data = self.cur.fetchall()
+            for nt in data:
+                date: datetime.date = nt[2]
+                time: datetime.time = nt[3]
+                text: str = nt[4]
+                res.append(Notification(uid=uid, date=date, time=time, text=text))
+            return res
+        except Exception as e:
+            print(e)
 
-_config = json.load(open("./config.json"))
+    def get_all_notifications(self):
+        try:
+            res: list[Notification] = []
+            self.cur.execute("SELECT * from notifications")
+            data = self.cur.fetchall()
+            for nt in data:
+                uid: int = nt[1]
+                date: datetime.date = nt[2]
+                time: datetime.time = nt[3]
+                text: str = nt[4]
+                res.append(Notification(uid=uid, date=date, time=time, text=text))
+            return res
+        except Exception as e:
+            print(e)
+
+
 db = _DataBase(
-    user=_config["DATABASE"]["USERNAME"],
-    password=_config["DATABASE"]["PASSWORD"],
-    dbname=_config["DATABASE"]["DB"],
-    host=_config["DATABASE"]["HOST"],
+    user=dbconfig["USERNAME"],
+    password=dbconfig["PASSWORD"],
+    dbname=dbconfig["DB"],
+    host=dbconfig["HOST"],
 )
