@@ -29,9 +29,11 @@ class DataBase:
 
     def insert_user(self, id: str, username: str):
         try:
-            self.cur.execute(
-                "INSERT INTO users (id, username) VALUES (%s, %s)", (id, username)
+            sql = (
+                "INSERT INTO users (id, username) VALUES (%s, %s) "
+                "ON CONFLICT (id) DO NOTHING;"
             )
+            self.cur.execute(sql, (id, username))
             self.conn.commit()
         except Exception as e:
             print(e)
@@ -51,7 +53,13 @@ class DataBase:
                 ),
             )
             notification.id = self.cur.fetchone()[0]
-            print(f"NT id: {notification.id}")
+
+            for obj in notification.attachments_id:
+                sql = (
+                    "INSERT INTO attachments (notification_id, file_id) VALUES (%s, %s)"
+                )
+                self.cur.execute(sql, (notification.id, obj))
+
             self.conn.commit()
         except Exception as e:
             print(e)

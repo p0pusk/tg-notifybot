@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import datetime
 
 
@@ -9,4 +9,4 @@ class Notification:
     date: datetime.date | None = None
     time: datetime.time | None = None
     text: str = ""
-    attachments_id: list[str] | None = None
+    attachments_id: list[str] = field(default_factory=list)

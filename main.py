@@ -3,7 +3,8 @@ import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters.command import Command
 
-from routes.creationroute import create_router
+from routes.create_route import create_router
+from routes.attachment_route import file_router
 from db import DataBase
 from config import bot_token, dbconfig
 from utils.utils import send_async_notification
@@ -38,6 +39,7 @@ async def start():
 async def main():
     await start()
     dp.include_router(create_router)
+    dp.include_router(file_router)
     await dp.start_polling(bot)
 
 

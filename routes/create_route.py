@@ -4,8 +4,8 @@ from aiogram import Bot, Router, types, F
 from aiogram.filters import Text
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import State, StatesGroup
 
+from utils.states import BotState
 from utils.calendar import Calendar
 from utils.notification import Notification
 from utils.timepicker import TimePicker
@@ -13,15 +13,8 @@ from utils.utils import send_async_notification
 from db import DataBase
 from config import bot_token, dbconfig
 
-
-class BotState(StatesGroup):
-    text = State()
-    date = State()
-    time = State()
-    attachment = State()
-
-
 create_router = Router()
+
 bot = Bot(bot_token)
 db = DataBase(
     user=dbconfig["USERNAME"],
@@ -31,7 +24,7 @@ db = DataBase(
 )
 
 
-@create_router.message(Command("create_notification"))
+@create_router.message(Command("create"))
 async def create_notification(message: types.Message, state: FSMContext):
     await state.set_state(BotState.text)
     await message.answer(text="Input notification text:")
@@ -91,9 +84,12 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
     elif command == TimePicker.command_confirm:
         nt.time = tp.time
         nt.time.replace(second=datetime.now().second)
+        await state.set_state(BotState.attachment)
         kb = [
             [
-                types.InlineKeyboardButton(text="No", callback_data="-ATTACHMENTS-NO-"),
+                types.InlineKeyboardButton(
+                    text="No", callback_data="-NOTIFICATION_DONE--"
+                ),
                 types.InlineKeyboardButton(
                     text="Yes", callback_data="-ATTACHMENTS-YES-"
                 ),
@@ -117,7 +113,7 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
         )
 
 
-@create_router.callback_query(Text("-ATTACHMENTS-NO-"))
+@create_router.callback_query(Text("-NOTIFICATION_DONE-"), BotState.attachment)
 async def handle_attachments_no(query: types.CallbackQuery, state: FSMContext):
     try:
         data = await state.get_data()
@@ -144,41 +140,3 @@ async def handle_attachments_no(query: types.CallbackQuery, state: FSMContext):
         await query.answer("Error occured when creating notification")
 
     await state.clear()
-
-
-@create_router.callback_query(Text("-ATTACHMENTS-YES-"))
-async def handle_attachments_yes(query: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    nt: Notification = data["notification"]
-    await query.message.edit_text(
-        text=f"*Text:* {nt.text}\n*Date:* {nt.date}\n*Time:* {nt.time}\n",
-        reply_markup=None,
-        parse_mode="Markdown",
-    )
-
-    await state.set_state(BotState.attachment)
-    await query.message.answer(text="Send attachments:")
-    query.answer()
-
-
-@create_router.message(BotState.attachment, F.content_type.in_({"document", "photo"}))
-async def handle_attachment(
-    message: types.Message,
-    state: FSMContext,
-):
-    try:
-        data = await state.get_data()
-        await message.answer(
-            text=(
-                f"Notification created!\n\n*Text*: {data['text']}\n*Date*:"
-                f" {data['date']}\n*Time* {data['hour']}:{data['minute']}\n"
-            ),
-            reply_markup=None,
-            parse_mode="Markdown",
-        )
-        print(message.document.file_id)
-        await message.answer_document(document=message.document.file_id)
-        await state.clear()
-    except Exception as e:
-        print(e)
-        await query.answer("Error occured when creating notification")
