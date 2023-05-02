@@ -4,12 +4,19 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters.command import Command
 
 from routes.creationroute import create_router
-from db import db
-from config import bot_token
+from db import DataBase
+from config import bot_token, dbconfig
+from utils.utils import send_async_notification
 
 bot = Bot(token=bot_token)
 logging.basicConfig(level=logging.INFO)
 dp = Dispatcher()
+db = DataBase(
+    user=dbconfig["USERNAME"],
+    password=dbconfig["PASSWORD"],
+    dbname=dbconfig["DB"],
+    host=dbconfig["HOST"],
+)
 
 
 @dp.message(Command("start"))
@@ -25,7 +32,7 @@ async def start():
 
     loop = asyncio.get_event_loop()
     for nt in notifications:
-        loop.create_task(nt.send(bot))
+        loop.create_task(send_async_notification(nt, bot))
 
 
 async def main():

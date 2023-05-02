@@ -9,8 +9,9 @@ from aiogram.fsm.state import State, StatesGroup
 from utils.calendar import Calendar
 from utils.notification import Notification
 from utils.timepicker import TimePicker
-from db import db
-from config import bot_token
+from utils.utils import send_async_notification
+from db import DataBase
+from config import bot_token, dbconfig
 
 
 class BotState(StatesGroup):
@@ -22,12 +23,12 @@ class BotState(StatesGroup):
 
 create_router = Router()
 bot = Bot(bot_token)
-
-
-async def run_at(dt, coro):
-    now = datetime.now()
-    await asyncio.sleep((dt - now).total_seconds())
-    return await coro
+db = DataBase(
+    user=dbconfig["USERNAME"],
+    password=dbconfig["PASSWORD"],
+    dbname=dbconfig["DB"],
+    host=dbconfig["HOST"],
+)
 
 
 @create_router.message(Command("create_notification"))
@@ -77,9 +78,15 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     nt: Notification = data["notification"]
     tp: TimePicker = data["timepicker"]
+    cal: Calendar = data["cal"]
+
     command = query.data.removeprefix(TimePicker.prefix)
     if command == TimePicker.command_back:
         nt.time = None
+        await state.set_state(BotState.date)
+        await query.message.edit_text(
+            f"Text: {nt.text}\nChoose date:", reply_markup=cal.get_keyboard()
+        )
 
     elif command == TimePicker.command_confirm:
         nt.time = tp.time
@@ -112,32 +119,30 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
 
 @create_router.callback_query(Text("-ATTACHMENTS-NO-"))
 async def handle_attachments_no(query: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    nt: Notification = data["notification"]
+    try:
+        data = await state.get_data()
+        nt: Notification = data["notification"]
 
-    if nt.date == None or nt.time == None:
-        query.answer("Error while creating notification")
-        raise Exception("date or time is null")
+        if nt.date == None or nt.time == None:
+            query.answer("Error while creating notification")
+            raise Exception("date or time is null")
 
-    loop = asyncio.get_event_loop()
-    nt.task = loop.create_task(
-        run_at(
-            datetime.datetime.combine(nt.date, nt.time),
-            query.message.answer(f"Notification!\n{nt.text}"),
+        asyncio.get_event_loop().create_task(send_async_notification(nt, bot))
+
+        db.insert_notification(nt)
+        await query.message.edit_text(
+            text=(
+                f"Notification created!\nText: {nt.text}\nDate: {nt.date}\nTime:"
+                f" {nt.time}\n"
+            ),
+            reply_markup=None,
+            parse_mode="Markdown",
         )
-    )
 
-    await query.message.edit_text(
-        text=(
-            f"Notification created!\nText: {nt.text}\nDate: {nt.date}\nTime:"
-            f" {nt.time}\n"
-        ),
-        reply_markup=None,
-        parse_mode="Markdown",
-    )
+    except Exception as e:
+        print(e)
+        await query.answer("Error occured when creating notification")
 
-    db.insert_notification(nt)
-    asyncio.get_event_loop().create_task(nt.send(bot))
     await state.clear()
 
 
@@ -176,3 +181,4 @@ async def handle_attachment(
         await state.clear()
     except Exception as e:
         print(e)
+        await query.answer("Error occured when creating notification")
