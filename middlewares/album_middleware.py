@@ -25,5 +25,7 @@ class AlbumMidleware(BaseMiddleware):
             self.album_data[event.media_group_id] = [event]
             await asyncio.sleep(self.latency)
             data["album"] = self.album_data[event.media_group_id]
+        except Exception as e:
+            print(e)
 
         return await handler(event, data)

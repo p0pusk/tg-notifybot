@@ -6,3 +6,5 @@ class BotState(StatesGroup):
     date = State()
     time = State()
     attachment = State()
+    ask_more_files = State()
+    periodic = State()

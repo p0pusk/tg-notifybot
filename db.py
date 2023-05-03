@@ -1,7 +1,7 @@
 import psycopg2
 import datetime
 
-from utils.notification import Notification
+from utils.notification import Attachment, Notification
 
 
 def singleton(class_):
@@ -37,32 +37,43 @@ class DataBase:
             self.conn.commit()
         except Exception as e:
             print(e)
+            raise e
 
     def insert_notification(self, notification: Notification):
         try:
+            sql = (
+                "INSERT INTO notifications (uid, date, time, description,"
+                " creation_date, creation_time, is_periodic, period, is_done) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING id"
+            )
+
             self.cur.execute(
-                (
-                    "INSERT INTO notifications (uid, date, time, text)"
-                    "VALUES (%s, %s, %s, %s) RETURNING id"
-                ),
+                sql,
                 (
                     notification.uid,
                     notification.date,
                     notification.time,
-                    notification.text,
+                    notification.description,
+                    notification.creation_date,
+                    notification.creation_time,
+                    notification.is_periodic,
+                    notification.period,
+                    notification.is_done,
                 ),
             )
             notification.id = self.cur.fetchone()[0]
 
             for obj in notification.attachments_id:
                 sql = (
-                    "INSERT INTO attachments (notification_id, file_id) VALUES (%s, %s)"
+                    "INSERT INTO attachments (notification_id, file_id, file_type)"
+                    " VALUES (%s, %s, %s)"
                 )
-                self.cur.execute(sql, (notification.id, obj))
+                self.cur.execute(sql, (notification.id, obj.file_id, obj.file_type))
 
             self.conn.commit()
         except Exception as e:
             print(e)
+            raise e
 
     def get_notifications_uid(self, uid: int):
         try:
@@ -70,16 +81,34 @@ class DataBase:
             self.cur.execute("SELECT * from notifications WHERE uid = %s", (uid,))
             data = self.cur.fetchall()
             for nt in data:
-                id: int = nt[0]
-                date: datetime.date = nt[2]
-                time: datetime.time = nt[3]
-                text: str = nt[4]
-                res.append(
-                    Notification(id=id, uid=uid, date=date, time=time, text=text)
+                notification = Notification(
+                    id=nt[0],
+                    uid=nt[1],
+                    description=nt[2],
+                    date=nt[2],
+                    time=nt[3],
+                    is_periodic=nt[4],
+                    period=nt[5],
+                    creation_date=nt[6],
+                    creation_time=nt[7],
+                    is_done=nt[8],
                 )
+                self.cur.execute(
+                    (
+                        "SELECT file_id, file_type FROM attachments "
+                        "WHERE  notification_id = %s"
+                    ),
+                    (notification.id,),
+                )
+                data = self.cur.fetchall()
+                for row in data:
+                    notification.attachments_id.append(Attachment(row[0], row[1]))
+
+                res.append(notification)
             return res
         except Exception as e:
             print(e)
+            raise e
 
     def get_all_notifications(self):
         try:
@@ -87,17 +116,48 @@ class DataBase:
             self.cur.execute("SELECT * from notifications")
             data = self.cur.fetchall()
             for nt in data:
-                id: int = nt[0]
-                uid: int = nt[1]
-                date: datetime.date = nt[2]
-                time: datetime.time = nt[3]
-                text: str = nt[4]
-                res.append(
-                    Notification(id=id, uid=uid, date=date, time=time, text=text)
+                notification = Notification(
+                    id=nt[0],
+                    uid=nt[1],
+                    description=nt[2],
+                    date=nt[3],
+                    time=nt[4],
+                    is_periodic=nt[5],
+                    period=nt[6],
+                    creation_date=nt[7],
+                    creation_time=nt[8],
+                    is_done=nt[9],
                 )
+
+                self.cur.execute(
+                    (
+                        "SELECT file_id, file_type FROM attachments "
+                        "WHERE  notification_id = %s"
+                    ),
+                    (notification.id,),
+                )
+                data = self.cur.fetchall()
+
+                for row in data:
+                    notification.attachments_id.append(Attachment(row[0], row[1]))
+
+                res.append(notification)
+            self.conn.commit()
             return res
         except Exception as e:
             print(e)
+            raise e
+
+    def mark_done(self, nt: Notification):
+        try:
+            self.cur.execute(
+                "UPDATE notifications SET is_done = TRUE WHERE id = %s",
+                (nt.id,),
+            )
+            self.conn.commit()
+        except Exception as e:
+            print(e)
+            raise e
 
     def delete_notification(self, nt: Notification):
         try:
@@ -105,3 +165,4 @@ class DataBase:
             self.conn.commit()
         except Exception as e:
             print(e)
+            raise e

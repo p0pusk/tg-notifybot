@@ -36,10 +36,12 @@ async def handle_text(message: types.Message, state: FSMContext):
         raise Exception("Message sender is None")
     nt = Notification(message.from_user.id)
     cal = Calendar()
-    nt.text = message.text
+    nt.description = message.text
     await state.update_data(notification=nt, cal=cal)
     await message.answer(
-        f"Text: {message.text}\nChoose date:", reply_markup=cal.get_keyboard()
+        f"{nt.text()}\nChoose date:",
+        reply_markup=cal.get_keyboard(),
+        parse_mode="Markdown",
     )
     await state.set_state(BotState.date)
 
@@ -56,14 +58,13 @@ async def cal_callback(query: types.CallbackQuery, state: FSMContext):
         nt.date = result
         await state.update_data(notification=nt, timepicker=tp)
         await query.message.edit_text(
-            text=f"Text: {nt.text}\nDate: {nt.date}\nChoose time:",
+            text=f"{nt.text()}\nChoose time:",
             reply_markup=tp.keyboard(),
+            parse_mode="Markdown",
         )
         await state.set_state(BotState.time)
     elif keyboard:
         await query.message.edit_reply_markup(reply_markup=keyboard)
-
-    await query.answer()
 
 
 @create_router.callback_query(Text(startswith=TimePicker.prefix), BotState.time)
@@ -78,7 +79,9 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
         nt.time = None
         await state.set_state(BotState.date)
         await query.message.edit_text(
-            f"Text: {nt.text}\nChoose date:", reply_markup=cal.get_keyboard()
+            f"{nt.text()}\nChoose date:",
+            reply_markup=cal.get_keyboard(),
+            parse_mode="Markdown",
         )
 
     elif command == TimePicker.command_confirm:
@@ -87,9 +90,7 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
         await state.set_state(BotState.attachment)
         kb = [
             [
-                types.InlineKeyboardButton(
-                    text="No", callback_data="-NOTIFICATION_DONE--"
-                ),
+                types.InlineKeyboardButton(text="No", callback_data="-TO_PERIODIC-"),
                 types.InlineKeyboardButton(
                     text="Yes", callback_data="-ATTACHMENTS-YES-"
                 ),
@@ -97,27 +98,98 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
         ]
 
         await query.message.edit_text(
-            text=(
-                f"*Text*: {nt.text}\n*Date*: {nt.date}\n*Time: {nt.time}*\nAdd"
-                " attachments?"
-            ),
+            text=f"{nt.text()}\nAdd attachments?",
             reply_markup=types.InlineKeyboardMarkup(inline_keyboard=kb),
             parse_mode="Markdown",
         )
     else:
         await tp.handle_command(query, command)
         await query.message.edit_text(
-            text=f"*Text:* {nt.text}\n*Date:* {nt.date}\n*Choose time:*",
+            text=f"{nt.text()}\n*Choose time:*",
             reply_markup=tp.keyboard(),
             parse_mode="Markdown",
         )
 
 
-@create_router.callback_query(Text("-NOTIFICATION_DONE-"), BotState.attachment)
-async def handle_attachments_no(query: types.CallbackQuery, state: FSMContext):
+@create_router.callback_query(Text("-TO_PERIODIC-"))
+async def handle_periodic(query: types.CallbackQuery, state: FSMContext):
+    await state.set_state(BotState.periodic)
+    data = await state.get_data()
+    nt: Notification = data["notification"]
+
+    kb = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="No", callback_data="-NOTIFICATION_DONE-"
+                ),
+                types.InlineKeyboardButton(text="Yes", callback_data="-PERIODIC-"),
+            ]
+        ]
+    )
+    await query.message.edit_text(
+        text=f"{nt.text()}\nDo you want to make notification periodic?",
+        reply_markup=kb,
+        parse_mode="Markdown",
+    )
+
+
+@create_router.callback_query(Text("-PERIODIC-"), BotState.periodic)
+async def periodic_handler(query: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    nt: Notification = data["notification"]
+    nt.is_periodic = True
+
+    kb = types.InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                types.InlineKeyboardButton(
+                    text="Daily", callback_data="-REPEAT_DAILY-"
+                ),
+                types.InlineKeyboardButton(
+                    text="Weekly", callback_data="-REPEAT_WEEKLY-"
+                ),
+                types.InlineKeyboardButton(
+                    text="Yearly", callback_data="-REPEAT_YEARLY-"
+                ),
+            ]
+        ]
+    )
+    await query.message.edit_text(
+        text=f"{nt.text()}Choose repeat interval:",
+        reply_markup=kb,
+        parse_mode="Markdown",
+    )
+
+
+@create_router.callback_query(Text(startswith="-REPEAT"), BotState.periodic)
+async def handle_repeat_value(query: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    nt: Notification = data["notification"]
+
+    period = query.data[8:-1]
+    if period == "DAILY":
+        nt.period = "daily"
+    elif period == "MONTHLY":
+        nt.period = "monthly"
+    elif period == "YEARLY":
+        nt.period = "yearly"
+    else:
+        raise Exception("[Notification period handler]: Unknown period")
+
+    await state.update_data(notification=nt)
+    await notifications_done(query, state)
+
+
+@create_router.callback_query(Text("-NOTIFICATION_DONE-"), BotState.periodic)
+async def notifications_done(query: types.CallbackQuery, state: FSMContext):
     try:
         data = await state.get_data()
         nt: Notification = data["notification"]
+
+        now = datetime.now()
+        nt.creation_date = now.date()
+        nt.creation_time = now.time()
 
         if nt.date == None or nt.time == None:
             query.answer("Error while creating notification")
@@ -127,10 +199,7 @@ async def handle_attachments_no(query: types.CallbackQuery, state: FSMContext):
 
         db.insert_notification(nt)
         await query.message.edit_text(
-            text=(
-                f"Notification created!\nText: {nt.text}\nDate: {nt.date}\nTime:"
-                f" {nt.time}\n"
-            ),
+            text=f"Notification created!\n{nt.text()}",
             reply_markup=None,
             parse_mode="Markdown",
         )
