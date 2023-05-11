@@ -85,7 +85,8 @@ class Calendar:
             return
         data = data.removeprefix(self.prefix)
         command, result = data.split("/")
-        keyboard = None
+
+        keyboard = self.get_keyboard(self.year, self.month)
 
         if command == self.command_next_month:
             if self.month == 12:
@@ -103,6 +104,8 @@ class Calendar:
                 self.month -= 1
             keyboard = self.get_keyboard(self.year, self.month)
 
-        day, month, year = result.split("-")
+        if result:
+            day, month, year = result.split("-")
+            return date(year=int(year), month=int(month), day=int(day)), keyboard
 
-        return date(year=int(year), month=int(month), day=int(day)), keyboard
+        return None, keyboard

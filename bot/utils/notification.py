@@ -6,7 +6,6 @@ import datetime
 class Attachment:
     file_id: str
     file_type: str
-    filename: str | None
 
 
 @dataclass

@@ -4,6 +4,7 @@ from aiogram import Router, types
 from aiogram.filters import Text
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.exceptions import TelegramBadRequest
 
 from bot import bot, scheduler, db
 from bot.utils.states import CreateState
@@ -17,8 +18,16 @@ create_router = Router()
 
 @create_router.message(Command("create"))
 async def create_notification(message: types.Message, state: FSMContext):
+    st = await state.get_state()
+    if st in CreateState:
+        try:
+            message_id = (await state.get_data())["m_id"]
+            await bot.delete_message(message.chat.id, message_id)
+        except KeyError or TelegramBadRequest:
+            pass
+
     await state.set_state(CreateState.text)
-    await message.answer(text="Input notification text:")
+    await message.answer(text="Input notification description:")
 
 
 @create_router.message(CreateState.text)
@@ -28,12 +37,12 @@ async def handle_text(message: types.Message, state: FSMContext):
     nt = Notification(message.from_user.id)
     cal = Calendar()
     nt.description = message.text
-    await state.update_data(notification=nt, cal=cal)
-    await message.answer(
+    msg = await message.answer(
         f"{nt.text()}\nChoose date:",
         reply_markup=cal.get_keyboard(),
         parse_mode="Markdown",
     )
+    await state.update_data(notification=nt, cal=cal, m_id=msg.message_id)
     await state.set_state(CreateState.date)
 
 
@@ -53,9 +62,9 @@ async def cal_callback(query: types.CallbackQuery, state: FSMContext):
             reply_markup=tp.keyboard(),
             parse_mode="Markdown",
         )
-        await state.set_state(CreateState.time)
+        return await state.set_state(CreateState.time)
     elif keyboard:
-        await query.message.edit_reply_markup(reply_markup=keyboard)
+        return await query.message.edit_reply_markup(reply_markup=keyboard)
 
 
 @create_router.callback_query(Text(startswith=TimePicker.prefix), CreateState.time)
@@ -194,7 +203,8 @@ async def notifications_done(query: types.CallbackQuery, state: FSMContext):
         db.insert_notification(nt)
         schedule_notification(nt)
 
-        await query.message.edit_text(
+        await query.message.delete()
+        await query.message.answer(
             text=f"Notification created!\n{nt.text()}",
             reply_markup=None,
             parse_mode="Markdown",

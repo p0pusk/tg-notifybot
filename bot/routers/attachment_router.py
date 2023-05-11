@@ -2,7 +2,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import Text, Filter
 from aiogram import Router, types, F
 
-from bot import bot
 from bot.utils.states import CreateState
 from bot.utils.notification import Attachment, Notification
 from bot.middlewares.album_middleware import AlbumMidleware
@@ -56,8 +55,7 @@ async def handle_mediagroup(
         else:
             return await message.answer("This type of file is not supported.")
 
-        file = await bot.get_file(file_id)
-        nt.attachments_id.append(Attachment(file_id, file_type, file.file_path))
+        nt.attachments_id.append(Attachment(file_id, file_type))
 
     await state.update_data(notification=nt)
     await message.answer(
@@ -101,8 +99,7 @@ async def handle_attachment(message: types.Message, state: FSMContext):
         else:
             await message.answer("This type is not supported.")
             return
-        file = await bot.get_file(file_id)
-        nt.attachments_id.append(Attachment(file_id, file_type, file.file_path))
+        nt.attachments_id.append(Attachment(file_id, file_type))
         await state.update_data(notification=nt)
         await state.set_state(CreateState.ask_more_files)
         await message.answer(

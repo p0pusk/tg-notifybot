@@ -64,12 +64,10 @@ class DataBase:
 
             for obj in notification.attachments_id:
                 sql = (
-                    "INSERT INTO attachments (notification_id, file_id, file_type,"
-                    " filename) VALUES (%s, %s, %s, %s)"
+                    "INSERT INTO attachments (notification_id, file_id, file_type)"
+                    " VALUES (%s, %s, %s)"
                 )
-                self.cur.execute(
-                    sql, (notification.id, obj.file_id, obj.file_type, obj.filename)
-                )
+                self.cur.execute(sql, (notification.id, obj.file_id, obj.file_type))
 
             self.conn.commit()
         except Exception as e:
