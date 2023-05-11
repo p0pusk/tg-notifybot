@@ -5,23 +5,14 @@ from aiogram.filters import Text
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 
-from utils.states import BotState
-from utils.calendar import Calendar
-from utils.notification import Notification
-from utils.timepicker import TimePicker
-from utils.utils import send_async_notification
-from db import DataBase
-from config import bot_token, dbconfig
+from bot import bot, scheduler, db
+from bot.utils.states import BotState
+from bot.utils.calendar import Calendar
+from bot.utils.notification import Notification
+from bot.utils.timepicker import TimePicker
+from bot.scheduler.utils import schedule_notification
 
 create_router = Router()
-
-bot = Bot(bot_token)
-db = DataBase(
-    user=dbconfig["USERNAME"],
-    password=dbconfig["PASSWORD"],
-    dbname=dbconfig["DB"],
-    host=dbconfig["HOST"],
-)
 
 
 @create_router.message(Command("create"))
@@ -139,6 +130,7 @@ async def periodic_handler(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     nt: Notification = data["notification"]
     nt.is_periodic = True
+    await state.update_data(notification=nt)
 
     kb = types.InlineKeyboardMarkup(
         inline_keyboard=[
@@ -150,7 +142,7 @@ async def periodic_handler(query: types.CallbackQuery, state: FSMContext):
                     text="Weekly", callback_data="-REPEAT_WEEKLY-"
                 ),
                 types.InlineKeyboardButton(
-                    text="Yearly", callback_data="-REPEAT_YEARLY-"
+                    text="Monthly", callback_data="-REPEAT_MONTHLY-"
                 ),
             ]
         ]
@@ -170,14 +162,18 @@ async def handle_repeat_value(query: types.CallbackQuery, state: FSMContext):
     period = query.data[8:-1]
     if period == "DAILY":
         nt.period = "daily"
+    elif period == "WEEKLY":
+        nt.period = "weekly"
     elif period == "MONTHLY":
         nt.period = "monthly"
-    elif period == "YEARLY":
-        nt.period = "yearly"
     else:
         raise Exception("[Notification period handler]: Unknown period")
 
     await state.update_data(notification=nt)
+    await query.message.edit_text(
+        text=f"{nt.text()}",
+        reply_markup=None,
+    )
     await notifications_done(query, state)
 
 
@@ -195,7 +191,7 @@ async def notifications_done(query: types.CallbackQuery, state: FSMContext):
             query.answer("Error while creating notification")
             raise Exception("date or time is null")
 
-        asyncio.get_event_loop().create_task(send_async_notification(nt, bot))
+        schedule_notification(scheduler, nt, bot)
 
         db.insert_notification(nt)
         await query.message.edit_text(

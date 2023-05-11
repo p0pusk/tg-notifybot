@@ -1,12 +1,10 @@
-from typing import Union
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import Text, Filter
 from aiogram import Router, types, F
 
-from db import DataBase
-from utils.states import BotState
-from utils.notification import Attachment, Notification
-from middlewares.album_middleware import AlbumMidleware
+from bot.utils.states import BotState
+from bot.utils.notification import Attachment, Notification
+from bot.middlewares.album_middleware import AlbumMidleware
 
 file_router = Router()
 file_router.message.middleware(AlbumMidleware())
@@ -28,8 +26,7 @@ async def handle_attachments_yes(query: types.CallbackQuery, state: FSMContext):
     )
 
     await state.set_state(BotState.attachment)
-    await query.message.answer(text="Send attachments:")
-    query.answer()
+    return await query.message.answer(text="Send attachments:")
 
 
 @file_router.message(

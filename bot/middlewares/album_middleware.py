@@ -1,6 +1,6 @@
 import asyncio
 from typing import Callable, Dict, Any, Awaitable
-from aiogram import BaseMiddleware, types
+from aiogram import BaseMiddleware
 from aiogram.types import Message
 
 

@@ -1,7 +1,6 @@
 import psycopg2
-import datetime
 
-from utils.notification import Attachment, Notification
+from bot.utils.notification import Attachment, Notification
 
 
 def singleton(class_):
@@ -114,6 +113,46 @@ class DataBase:
         try:
             res: list[Notification] = []
             self.cur.execute("SELECT * from notifications")
+            data = self.cur.fetchall()
+            for nt in data:
+                notification = Notification(
+                    id=nt[0],
+                    uid=nt[1],
+                    description=nt[2],
+                    date=nt[3],
+                    time=nt[4],
+                    is_periodic=nt[5],
+                    period=nt[6],
+                    creation_date=nt[7],
+                    creation_time=nt[8],
+                    is_done=nt[9],
+                )
+
+                self.cur.execute(
+                    (
+                        "SELECT file_id, file_type FROM attachments "
+                        "WHERE  notification_id = %s"
+                    ),
+                    (notification.id,),
+                )
+                data = self.cur.fetchall()
+
+                for row in data:
+                    notification.attachments_id.append(Attachment(row[0], row[1]))
+
+                res.append(notification)
+            self.conn.commit()
+            return res
+        except Exception as e:
+            print(e)
+            raise e
+
+    def get_pending(self):
+        try:
+            res: list[Notification] = []
+            self.cur.execute(
+                "SELECT * from notifications WHERE is_done=FALSE OR is_periodic=TRUE"
+            )
             data = self.cur.fetchall()
             for nt in data:
                 notification = Notification(
