@@ -1,27 +1,27 @@
 import asyncio
 from datetime import datetime
-from aiogram import Bot, Router, types, F
+from aiogram import Router, types
 from aiogram.filters import Text
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 
 from bot import bot, scheduler, db
-from bot.utils.states import BotState
+from bot.utils.states import CreateState
 from bot.utils.calendar import Calendar
 from bot.utils.notification import Notification
 from bot.utils.timepicker import TimePicker
-from bot.scheduler.utils import schedule_notification
+from bot.utils.scheduler import schedule_notification
 
 create_router = Router()
 
 
 @create_router.message(Command("create"))
 async def create_notification(message: types.Message, state: FSMContext):
-    await state.set_state(BotState.text)
+    await state.set_state(CreateState.text)
     await message.answer(text="Input notification text:")
 
 
-@create_router.message(BotState.text)
+@create_router.message(CreateState.text)
 async def handle_text(message: types.Message, state: FSMContext):
     if not message.from_user:
         raise Exception("Message sender is None")
@@ -34,10 +34,10 @@ async def handle_text(message: types.Message, state: FSMContext):
         reply_markup=cal.get_keyboard(),
         parse_mode="Markdown",
     )
-    await state.set_state(BotState.date)
+    await state.set_state(CreateState.date)
 
 
-@create_router.callback_query(Text(startswith=Calendar.prefix), BotState.date)
+@create_router.callback_query(Text(startswith=Calendar.prefix), CreateState.date)
 async def cal_callback(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     cal: Calendar = data["cal"]
@@ -53,12 +53,12 @@ async def cal_callback(query: types.CallbackQuery, state: FSMContext):
             reply_markup=tp.keyboard(),
             parse_mode="Markdown",
         )
-        await state.set_state(BotState.time)
+        await state.set_state(CreateState.time)
     elif keyboard:
         await query.message.edit_reply_markup(reply_markup=keyboard)
 
 
-@create_router.callback_query(Text(startswith=TimePicker.prefix), BotState.time)
+@create_router.callback_query(Text(startswith=TimePicker.prefix), CreateState.time)
 async def time_handler(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     nt: Notification = data["notification"]
@@ -68,7 +68,7 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
     command = query.data.removeprefix(TimePicker.prefix)
     if command == TimePicker.command_back:
         nt.time = None
-        await state.set_state(BotState.date)
+        await state.set_state(CreateState.date)
         await query.message.edit_text(
             f"{nt.text()}\nChoose date:",
             reply_markup=cal.get_keyboard(),
@@ -78,7 +78,7 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
     elif command == TimePicker.command_confirm:
         nt.time = tp.time
         nt.time.replace(second=datetime.now().second)
-        await state.set_state(BotState.attachment)
+        await state.set_state(CreateState.attachment)
         kb = [
             [
                 types.InlineKeyboardButton(text="No", callback_data="-TO_PERIODIC-"),
@@ -104,7 +104,7 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
 
 @create_router.callback_query(Text("-TO_PERIODIC-"))
 async def handle_periodic(query: types.CallbackQuery, state: FSMContext):
-    await state.set_state(BotState.periodic)
+    await state.set_state(CreateState.periodic)
     data = await state.get_data()
     nt: Notification = data["notification"]
 
@@ -125,7 +125,7 @@ async def handle_periodic(query: types.CallbackQuery, state: FSMContext):
     )
 
 
-@create_router.callback_query(Text("-PERIODIC-"), BotState.periodic)
+@create_router.callback_query(Text("-PERIODIC-"), CreateState.periodic)
 async def periodic_handler(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     nt: Notification = data["notification"]
@@ -154,7 +154,7 @@ async def periodic_handler(query: types.CallbackQuery, state: FSMContext):
     )
 
 
-@create_router.callback_query(Text(startswith="-REPEAT"), BotState.periodic)
+@create_router.callback_query(Text(startswith="-REPEAT"), CreateState.periodic)
 async def handle_repeat_value(query: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     nt: Notification = data["notification"]
@@ -177,7 +177,7 @@ async def handle_repeat_value(query: types.CallbackQuery, state: FSMContext):
     await notifications_done(query, state)
 
 
-@create_router.callback_query(Text("-NOTIFICATION_DONE-"), BotState.periodic)
+@create_router.callback_query(Text("-NOTIFICATION_DONE-"), CreateState.periodic)
 async def notifications_done(query: types.CallbackQuery, state: FSMContext):
     try:
         data = await state.get_data()
@@ -191,9 +191,9 @@ async def notifications_done(query: types.CallbackQuery, state: FSMContext):
             query.answer("Error while creating notification")
             raise Exception("date or time is null")
 
-        schedule_notification(scheduler, nt, bot)
-
         db.insert_notification(nt)
+        schedule_notification(nt)
+
         await query.message.edit_text(
             text=f"Notification created!\n{nt.text()}",
             reply_markup=None,

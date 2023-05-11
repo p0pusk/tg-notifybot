@@ -2,7 +2,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.filters import Text, Filter
 from aiogram import Router, types, F
 
-from bot.utils.states import BotState
+from bot import bot
+from bot.utils.states import CreateState
 from bot.utils.notification import Attachment, Notification
 from bot.middlewares.album_middleware import AlbumMidleware
 
@@ -25,13 +26,13 @@ async def handle_attachments_yes(query: types.CallbackQuery, state: FSMContext):
         parse_mode="Markdown",
     )
 
-    await state.set_state(BotState.attachment)
+    await state.set_state(CreateState.attachment)
     return await query.message.answer(text="Send attachments:")
 
 
 @file_router.message(
     MediagroupFilter(),
-    BotState.attachment,
+    CreateState.attachment,
     F.content_type.in_({"document", "photo", "audio", "video"}),
 )
 async def handle_mediagroup(
@@ -55,7 +56,8 @@ async def handle_mediagroup(
         else:
             return await message.answer("This type of file is not supported.")
 
-        nt.attachments_id.append(Attachment(file_id, file_type))
+        file = await bot.get_file(file_id)
+        nt.attachments_id.append(Attachment(file_id, file_type, file.file_path))
 
     await state.update_data(notification=nt)
     await message.answer(
@@ -74,11 +76,11 @@ async def handle_mediagroup(
         ),
     )
 
-    await state.set_state(BotState.ask_more_files)
+    await state.set_state(CreateState.ask_more_files)
 
 
 @file_router.message(
-    BotState.attachment, F.content_type.in_({"document", "photo", "audio", "video"})
+    CreateState.attachment, F.content_type.in_({"document", "photo", "audio", "video"})
 )
 async def handle_attachment(message: types.Message, state: FSMContext):
     data = await state.get_data()
@@ -99,9 +101,10 @@ async def handle_attachment(message: types.Message, state: FSMContext):
         else:
             await message.answer("This type is not supported.")
             return
-        nt.attachments_id.append(Attachment(file_id, file_type))
+        file = await bot.get_file(file_id)
+        nt.attachments_id.append(Attachment(file_id, file_type, file.file_path))
         await state.update_data(notification=nt)
-        await state.set_state(BotState.ask_more_files)
+        await state.set_state(CreateState.ask_more_files)
         await message.answer(
             text="Got your file. Attach more?",
             reply_markup=types.InlineKeyboardMarkup(
@@ -122,7 +125,7 @@ async def handle_attachment(message: types.Message, state: FSMContext):
         await message.answer("Error occured while getting your file")
 
 
-@file_router.callback_query(Text("-ATTACH_MORE-"), BotState.ask_more_files)
+@file_router.callback_query(Text("-ATTACH_MORE-"), CreateState.ask_more_files)
 async def attach_more(query: types.CallbackQuery, state: FSMContext):
-    await state.set_state(BotState.attachment)
+    await state.set_state(CreateState.attachment)
     await query.message.edit_text(text="Send attachments:", reply_markup=None)

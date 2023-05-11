@@ -4,8 +4,9 @@ import datetime
 
 @dataclass
 class Attachment:
-    file_id: str | None = None
-    file_type: str | None = None
+    file_id: str
+    file_type: str
+    filename: str | None
 
 
 @dataclass
@@ -27,7 +28,7 @@ class Notification:
         if self.description:
             text += f"*Description:* {self.description}\n"
         if self.date:
-            text += f"*Date:* {self.date.strftime('%d-%m-%Y')}\n"
+            text += f"*Date:* {self.date.strftime('%d.%m.%Y')}\n"
         if self.time:
             text += f"*Time:* {self.time.strftime('%H:%M')}\n"
         if self.is_periodic:

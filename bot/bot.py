@@ -1,36 +1,39 @@
 import asyncio
-from aiogram import types
-from aiogram.filters.command import Command
+from aiogram.types import BotCommand
 
-from bot import bot, dp, db, scheduler, config
-from bot.routes.create_route import create_router
-from bot.routes.attachment_route import file_router
-from bot.scheduler.utils import schedule_notification, schedule_periodic
+from bot import bot, dp, db, scheduler
+from bot.routers import main_router, create_router, file_router
+from bot.utils.scheduler import schedule_notification, schedule_periodic
 
 
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    await message.answer("Hello!")
-    db.insert_user(id=message.from_user.id, username=message.from_user.username)
+async def setup_bot_commands():
+    bot_commands = [
+        BotCommand(command="/help", description="Show help"),
+        BotCommand(command="/create", description="Create new notification"),
+        BotCommand(command="/show_current", description="Show current notifications"),
+        BotCommand(command="/show_done", description="Show done notifications"),
+    ]
+    await bot.set_my_commands(bot_commands)
 
 
 async def awake():
+    await setup_bot_commands()
     notifications = db.get_pending()
     if notifications is None:
         return
 
-    loop = asyncio.get_event_loop()
     for nt in notifications:
         if nt.is_periodic:
-            schedule_periodic(scheduler, nt, bot)
+            schedule_periodic(nt)
         else:
-            schedule_notification(scheduler, nt, bot)
+            schedule_notification(nt)
 
     scheduler.start()
 
 
 async def start():
     await awake()
+    dp.include_router(main_router)
     dp.include_router(create_router)
     dp.include_router(file_router)
     await dp.start_polling(bot)

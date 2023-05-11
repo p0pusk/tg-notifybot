@@ -64,10 +64,12 @@ class DataBase:
 
             for obj in notification.attachments_id:
                 sql = (
-                    "INSERT INTO attachments (notification_id, file_id, file_type)"
-                    " VALUES (%s, %s, %s)"
+                    "INSERT INTO attachments (notification_id, file_id, file_type,"
+                    " filename) VALUES (%s, %s, %s, %s)"
                 )
-                self.cur.execute(sql, (notification.id, obj.file_id, obj.file_type))
+                self.cur.execute(
+                    sql, (notification.id, obj.file_id, obj.file_type, obj.filename)
+                )
 
             self.conn.commit()
         except Exception as e:
@@ -147,12 +149,62 @@ class DataBase:
             print(e)
             raise e
 
-    def get_pending(self):
+    def get_pending(self, uid: int | None = None):
         try:
             res: list[Notification] = []
-            self.cur.execute(
-                "SELECT * from notifications WHERE is_done=FALSE OR is_periodic=TRUE"
-            )
+            if not uid:
+                sql = (
+                    "SELECT * from notifications WHERE is_done=FALSE OR"
+                    " is_periodic=TRUE"
+                )
+                self.cur.execute(sql)
+            else:
+                sql = (
+                    "SELECT * from notifications WHERE (is_done=FALSE OR"
+                    " is_periodic=TRUE) AND uid = %s"
+                )
+                self.cur.execute(sql, (uid,))
+
+            data = self.cur.fetchall()
+            for nt in data:
+                notification = Notification(
+                    id=nt[0],
+                    uid=nt[1],
+                    description=nt[2],
+                    date=nt[3],
+                    time=nt[4],
+                    is_periodic=nt[5],
+                    period=nt[6],
+                    creation_date=nt[7],
+                    creation_time=nt[8],
+                    is_done=nt[9],
+                )
+
+                self.cur.execute(
+                    (
+                        "SELECT file_id, file_type FROM attachments "
+                        "WHERE  notification_id = %s"
+                    ),
+                    (notification.id,),
+                )
+                data = self.cur.fetchall()
+
+                for row in data:
+                    notification.attachments_id.append(Attachment(row[0], row[1]))
+
+                res.append(notification)
+            self.conn.commit()
+            return res
+        except Exception as e:
+            print(e)
+            raise e
+
+    def get_done(self, uid: int):
+        try:
+            res: list[Notification] = []
+            sql = "SELECT * from notifications WHERE is_done=TRUE AND uid = %s"
+            self.cur.execute(sql, (uid,))
+
             data = self.cur.fetchall()
             for nt in data:
                 notification = Notification(

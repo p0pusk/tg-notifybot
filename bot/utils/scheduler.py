@@ -104,7 +104,7 @@ def schedule_notification(nt: Notification):
     if nt.date and nt.time:
         dt = datetime.datetime.combine(nt.date, nt.time)
         scheduler.add_job(
-            send_notification, "date", run_date=dt, args=[nt, bot], id=nt.id
+            send_notification, "date", run_date=dt, args=[nt, bot], id=str(nt.id)
         )
     else:
         raise Exception("Exception: Notifications is not fully initialized")
