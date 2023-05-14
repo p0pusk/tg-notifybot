@@ -1,4 +1,5 @@
 import psycopg2
+from typing import Any, Mapping, Sequence
 
 from bot.utils.notification import Attachment, Notification
 
@@ -25,6 +26,14 @@ class DataBase:
             raise Exception("Can`t establish connection to database")
 
         self.cur = self.conn.cursor()
+
+    def excecute(self, sql: str, args: Sequence[Any] | Mapping[str, Any] | None = None):
+        try:
+            self.cur.execute(sql, args)
+            self.conn.commit()
+        except Exception as e:
+            print(e)
+            raise e
 
     def insert_user(self, id: str, username: str):
         try:

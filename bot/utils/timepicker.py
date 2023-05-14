@@ -11,8 +11,9 @@ class TimePicker:
     command_hours_up = "-HOURS-UP-"
     command_hours_down = "-HOURS-DOWN-"
 
-    def __init__(self) -> None:
-        self.time: time = datetime.now().time()
+    def __init__(self, time: time = datetime.now().time()) -> None:
+        self.time = time
+        self.time.replace(second=0)
 
     def keyboard(self):
         kb = [

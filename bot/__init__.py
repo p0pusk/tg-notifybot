@@ -1,6 +1,7 @@
 import logging
 from aiogram import Bot, Dispatcher
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.base import Job
 
 import config
 from bot.db import DataBase
@@ -18,3 +19,5 @@ db = DataBase(
     dbname=config.dbconfig["DB"],
     host=config.dbconfig["HOST"],
 )
+
+jobs = list[Job]

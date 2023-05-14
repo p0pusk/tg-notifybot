@@ -8,3 +8,10 @@ class CreateState(StatesGroup):
     attachment = State()
     ask_more_files = State()
     periodic = State()
+
+
+class EditState(StatesGroup):
+    idle = State()
+    description = State()
+    date = State()
+    time = State()

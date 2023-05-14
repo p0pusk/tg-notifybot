@@ -11,7 +11,7 @@ from bot.utils.states import CreateState
 from bot.utils.calendar import Calendar
 from bot.utils.notification import Notification
 from bot.utils.timepicker import TimePicker
-from bot.utils.scheduler import schedule_notification
+from bot.utils.scheduler import _schedule_single
 
 create_router = Router()
 
@@ -86,7 +86,6 @@ async def time_handler(query: types.CallbackQuery, state: FSMContext):
 
     elif command == TimePicker.command_confirm:
         nt.time = tp.time
-        nt.time.replace(second=datetime.now().second)
         await state.set_state(CreateState.attachment)
         kb = [
             [
@@ -201,7 +200,7 @@ async def notifications_done(query: types.CallbackQuery, state: FSMContext):
             raise Exception("date or time is null")
 
         db.insert_notification(nt)
-        schedule_notification(nt)
+        _schedule_single(nt)
 
         await query.message.delete()
         await query.message.answer(

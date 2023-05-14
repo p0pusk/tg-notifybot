@@ -22,7 +22,7 @@ months = {
 
 
 class Calendar:
-    prefix = "CAL/"
+    prefix = "CAL"
 
     def __init__(self) -> None:
         self.command_next_month = "NEXT"
@@ -41,7 +41,8 @@ class Calendar:
         kb = [
             [
                 types.InlineKeyboardButton(
-                    text=f"{months[month]} {year}", callback_data=f"{self.prefix}/"
+                    text=f"{months[month]} {year}",
+                    callback_data=f"{self.prefix}//",
                 )
             ]
         ]
@@ -55,9 +56,9 @@ class Calendar:
                 types.InlineKeyboardButton(
                     text=day if day != 0 else " ",
                     callback_data=(
-                        f"{self.prefix}/{day}-{month}-{year}"
+                        f"{self.prefix}//{day}-{month}-{year}"
                         if day != 0
-                        else f"{self.prefix}/"
+                        else f"{self.prefix}//"
                     ),
                 )
             )
@@ -69,11 +70,11 @@ class Calendar:
             [
                 types.InlineKeyboardButton(
                     text=self.button_prev,
-                    callback_data=f"{self.prefix}{self.command_prev_month}/",
+                    callback_data=f"{self.prefix}/{self.command_prev_month}/",
                 ),
                 types.InlineKeyboardButton(
                     text=self.button_next,
-                    callback_data=f"{self.prefix}{self.command_next_month}/",
+                    callback_data=f"{self.prefix}/{self.command_next_month}/",
                 ),
             ]
         )
@@ -83,10 +84,9 @@ class Calendar:
     def parse_query(self, data: str | None):
         if data is None:
             return
-        data = data.removeprefix(self.prefix)
-        command, result = data.split("/")
+        _, command, result = data.split("/")
 
-        keyboard = self.get_keyboard(self.year, self.month)
+        keyboard = None
 
         if command == self.command_next_month:
             if self.month == 12:
@@ -106,6 +106,6 @@ class Calendar:
 
         if result:
             day, month, year = result.split("-")
-            return date(year=int(year), month=int(month), day=int(day)), keyboard
+            return (date(year=int(year), month=int(month), day=int(day)), keyboard)
 
         return None, keyboard

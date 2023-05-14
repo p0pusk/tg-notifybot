@@ -5,7 +5,7 @@ from bot import db, bot, scheduler
 from bot.utils.notification import Notification
 
 
-async def send_notification(nt: Notification, bot: Bot):
+async def _send_notification(nt: Notification, bot: Bot):
     msg = await bot.send_message(
         chat_id=nt.uid,
         text=f"*Notification!*\n\n{nt.description}",
@@ -56,20 +56,20 @@ async def send_notification(nt: Notification, bot: Bot):
     db.mark_done(nt)
 
     if nt.is_periodic:
-        schedule_periodic(nt)
+        _schedule_periodic(nt)
 
 
-def schedule_periodic(nt: Notification):
+def _schedule_periodic(nt: Notification):
     if not nt.date or not nt.time:
         raise Exception("Date and/or time not initialized")
 
     if not nt.is_done:
-        schedule_notification(scheduler, nt, bot)
+        _schedule_single(nt)
         return
 
     if nt.period == "daily":
         scheduler.add_job(
-            send_notification,
+            _send_notification,
             "cron",
             args=[nt, bot],
             day="*",
@@ -79,7 +79,7 @@ def schedule_periodic(nt: Notification):
         )
     elif nt.period == "weekly":
         scheduler.add_job(
-            send_notification,
+            _send_notification,
             "cron",
             args=[nt, bot],
             day="*/7",
@@ -89,7 +89,7 @@ def schedule_periodic(nt: Notification):
         )
     elif nt.period == "monthly":
         scheduler.add_job(
-            send_notification,
+            _send_notification,
             "cron",
             args=[nt, bot],
             month="*",
@@ -97,14 +97,27 @@ def schedule_periodic(nt: Notification):
             hour=nt.time.hour,
             minute=nt.time.minute,
             id=str(nt.id),
+            misfire_grace_time=None,
         )
 
 
-def schedule_notification(nt: Notification):
+def _schedule_single(nt: Notification):
     if nt.date and nt.time:
         dt = datetime.datetime.combine(nt.date, nt.time)
         scheduler.add_job(
-            send_notification, "date", run_date=dt, args=[nt, bot], id=str(nt.id)
+            _send_notification,
+            "date",
+            run_date=dt,
+            args=[nt, bot],
+            id=str(nt.id),
+            misfire_grace_time=None,
         )
     else:
         raise Exception("Exception: Notifications is not fully initialized")
+
+
+def schedule_notification(nt: Notification):
+    if nt.is_periodic:
+        _schedule_periodic(nt)
+    else:
+        _schedule_single(nt)
