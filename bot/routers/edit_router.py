@@ -243,19 +243,3 @@ async def handle_calendar(query: types.CallbackQuery, state: FSMContext):
         return await state.set_state(EditState.idle)
     elif keyboard:
         return await query.message.edit_reply_markup(reply_markup=keyboard)
-
-
-@edit_router.message(Command("show_done"))
-async def show_done(message: types.Message):
-    notifications = db.get_done(uid=message.from_user.id)
-
-    kb = InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(text="Return", callback_data="-EDIT_DESCRIPTION-"),
-            ],
-        ]
-    )
-
-    for nt in notifications:
-        await message.answer(f"{nt.text()}", parse_mode="Markdown", reply_markup=kb)

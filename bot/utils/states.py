@@ -15,3 +15,9 @@ class EditState(StatesGroup):
     description = State()
     date = State()
     time = State()
+
+
+class ReturnState(StatesGroup):
+    idle = State()
+    date = State()
+    time = State()

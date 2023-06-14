@@ -264,3 +264,38 @@ class DataBase:
         except Exception as e:
             print(e)
             raise e
+
+    def get_notification(self, id: int):
+        try:
+            self.cur.execute("SELECT * from notifications where id = %s", (id,))
+            self.conn.commit()
+            data = self.cur.fetchone()
+            if data is not None:
+                notification = Notification(
+                    id=data[0],
+                    uid=data[1],
+                    description=data[2],
+                    date=data[2],
+                    time=data[3],
+                    is_periodic=data[4],
+                    period=data[5],
+                    creation_date=data[6],
+                    creation_time=data[7],
+                    is_done=data[8],
+                )
+
+                self.cur.execute(
+                    (
+                        "SELECT file_id, file_type FROM attachments "
+                        "WHERE  notification_id = %s"
+                    ),
+                    (notification.id,),
+                )
+                data = self.cur.fetchall()
+
+                for row in data:
+                    notification.attachments_id.append(Attachment(row[0], row[1]))
+                return notification
+        except Exception as e:
+            print(e)
+            raise e

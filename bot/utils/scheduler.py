@@ -56,6 +56,23 @@ async def _send_notification(nt: Notification, bot: Bot):
     db.mark_done(nt)
 
     if nt.is_periodic:
+        if nt.period == "daily":
+            nt.date = nt.date + datetime.timedelta(days=1)
+        elif nt.period == "weekly":
+            nt.date = nt.date + datetime.timedelta(weeks=1)
+        elif nt.period == "monthly":
+            if nt.date.month != 12:
+                nt.date = datetime.date(nt.date.year, nt.date.month + 1, nt.date.day)
+            else:
+                nt.date = datetime.date(nt.date.year + 1, 1, nt.date.day)
+        sql = """UPDATE notifications SET date = %s WHERE id=%s"""
+        db.excecute(
+            sql,
+            (
+                nt.date,
+                nt.id,
+            ),
+        )
         _schedule_periodic(nt)
 
 

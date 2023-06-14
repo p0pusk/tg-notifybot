@@ -1,7 +1,7 @@
 from aiogram.types import BotCommand
 
 from bot import bot, dp, db, scheduler
-from bot.routers import edit_router, create_router, file_router
+from bot.routers import edit_router, create_router, file_router, return_router
 from bot.utils.scheduler import schedule_notification
 
 
@@ -32,4 +32,5 @@ async def start():
     dp.include_router(edit_router)
     dp.include_router(create_router)
     dp.include_router(file_router)
+    dp.include_router(return_router)
     await dp.start_polling(bot)
